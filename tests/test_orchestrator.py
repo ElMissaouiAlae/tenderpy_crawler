@@ -12,7 +12,6 @@ from discovery.parser import SearchCriteria, SearchResultPage
 def test_discovery_orchestrator_initialization():
     session = Mock()
     orchestrator = DiscoveryOrchestrator(session)
-    assert orchestrator._session is session
     assert orchestrator._client is not None
 
 

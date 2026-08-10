@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-
-from core.exceptions import HttpRequestError, SearchExecutionError
+from core.exceptions import HttpRequestError, PaginationError, SearchExecutionError
 from core.session import SearchSession
 
 from .parser import SearchCriteria, SearchResultPage, SearchResultParser
@@ -12,14 +11,14 @@ from .paginator import Paginator
 
 class DiscoveryClient:
     """Execute searches through a SearchSession and delegate parsing to SearchResultParser."""
-    
+
     PAGER_BOTTOM_PREFIX = "ctl0$CONTENU_PAGE$resultSearch$PagerBottom"
 
     PAGER_FIRST = f"{PAGER_BOTTOM_PREFIX}$ctl0"
     PAGER_PREVIOUS = f"{PAGER_BOTTOM_PREFIX}$ctl1"
     PAGER_NEXT = f"{PAGER_BOTTOM_PREFIX}$ctl2"
     PAGER_LAST = f"{PAGER_BOTTOM_PREFIX}$ctl3"
-    
+
     ROW_ECHO_PREFIX = "ctl0$CONTENU_PAGE$resultSearch$tableauResultSearch"
 
     SEARCH_URL = "index.php?page=entreprise.EntrepriseAdvancedSearch&searchAnnCons"
@@ -63,11 +62,12 @@ class DiscoveryClient:
         # but PRADO seems tolerant of these being absent (unlike the ones above)
     }
 
-    def __init__(self, session: SearchSession) -> None:     # dependency injection pattern
+    def __init__(self, session: SearchSession) -> None:
         """Initialize the discovery client with an active SearchSession."""
         self._session = session
         self._parser = SearchResultParser()
         self._paginator = Paginator()
+        self._last_row_echo: dict[str, str] = {}
 
     def search(self, criteria: SearchCriteria) -> SearchResultPage:
         """Execute a search and return the first page of results."""
@@ -76,10 +76,10 @@ class DiscoveryClient:
             payload.update(self._session.state.to_payload())
 
             response = self._session.post(self.SEARCH_URL, data=payload)
-            
+
             page = self._parser.parse(response.text)
             self._paginator.sync_from_page(page)
-            self._last_row_echo = self._build_row_echo_payload(page)    
+            self._last_row_echo = self._build_row_echo_payload(page)
 
             return page
         except HttpRequestError as exc:
@@ -90,7 +90,7 @@ class DiscoveryClient:
     def next_page(self, page: SearchResultPage) -> SearchResultPage:
         """Fetch the next page of results."""
         if not self._paginator.has_next_page():
-            raise StopIteration("No more pages available")
+            raise PaginationError("No more pages available")
 
         try:
             payload = self._paginator.next_page_payload()   # numPage/listePageSize, Top+Bottom
@@ -104,9 +104,8 @@ class DiscoveryClient:
             self._paginator.sync_from_page(page)
             self._last_row_echo = self._build_row_echo_payload(page)  # refresh for page N+2
 
-
             return page
-        except StopIteration:
+        except PaginationError:
             raise
         except HttpRequestError as exc:
             raise SearchExecutionError(f"Pagination request failed: {exc}") from exc
@@ -150,18 +149,21 @@ class DiscoveryClient:
         if criteria.publication_date_to:
             payload[self.DATE_TO_PARAM] = criteria.publication_date_to.strftime("%d/%m/%Y")
 
-
         return payload
-    
+
     def _build_row_echo_payload(self, page: SearchResultPage) -> dict[str, str]:
         """Reconstruct the ctl{n}$refCons / ctl{n}$orgCons hidden fields
         PRADO expects on the next postback, from already-parsed results.
 
         Index is 1-based and follows render order — must match exactly
-        how PRADO numbered the repeater on the page we parsed.
+        how PRADO numbered the repeater on the page we parsed. Rows missing
+        their identity fields are skipped rather than echoed as the literal
+        string "None" (which is what str()-ing a None into form data would send).
         """
         payload: dict[str, str] = {}
         for i, result in enumerate(page.tenders, start=1):
+            if result.tender_id is None or result.organization_acronym is None:
+                continue
             payload[f"{self.ROW_ECHO_PREFIX}$ctl{i}$refCons"] = result.tender_id
             payload[f"{self.ROW_ECHO_PREFIX}$ctl{i}$orgCons"] = result.organization_acronym
         return payload

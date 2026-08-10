@@ -2,12 +2,37 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Any
 import requests
 
 from .exceptions import HtmlParsingError, PradoStateError, SessionInitializationError
 from .http import HttpClient
-from .models import SessionState
+
+
+@dataclass
+class SessionState:
+    """Represents the current hidden PRADO state for a server session."""
+
+    prado_page_state: str | None = None
+
+    def to_payload(self) -> dict[str, str]:
+        """Convert the current PRADO session state into POST parameters.
+
+        Raises:
+            PradoStateError: if PRADO_PAGESTATE hasn't been captured yet —
+                every postback requires it, so a missing value here means
+                this was called before any page was fetched.
+        """
+        if self.prado_page_state is None:
+            raise PradoStateError(
+                "PRADO_PAGESTATE is not set — fetch a page before building a payload"
+            )
+
+        return {
+            "PRADO_PAGESTATE": self.prado_page_state,
+            "PRADO_POSTBACK_PARAMETER": "undefined",
+        }
 
 
 class SearchSession:
@@ -32,13 +57,13 @@ class SearchSession:
             self._update_state_from_html(response.text)
         except (HtmlParsingError, PradoStateError) as exc:
             raise SessionInitializationError(f"Failed to initialize PRADO state: {exc}") from exc
-            
+
         return response
 
     def get(self, url: str) -> requests.Response:
         """Perform a GET request and refresh the PRADO state from the returned HTML."""
         response = self._http_client.get(url)
-        
+
         # Mid-session parsing failure shouldn't throw an "Initialization" error
         self._update_state_from_html(response.text)
         return response
@@ -46,7 +71,7 @@ class SearchSession:
     def post(self, url: str, **kwargs: Any) -> requests.Response:
         """Perform a POST request and refresh the PRADO state from the returned HTML."""
         response = self._http_client.post(url, **kwargs)
-        
+
         # Mid-session parsing failure shouldn't throw an "Initialization" error
         self._update_state_from_html(response.text)
         return response

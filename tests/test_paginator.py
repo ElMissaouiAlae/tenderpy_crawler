@@ -2,6 +2,7 @@
 
 import pytest
 
+from core.exceptions import PaginationError
 from discovery.paginator import Paginator, PageParams
 from discovery.parser import SearchResultPage
 
@@ -126,7 +127,7 @@ def test_paginator_next_page_payload_raises_when_no_next_page():
     paginator._current_page = 5
     paginator._total_pages = 5
     
-    with pytest.raises(StopIteration, match="No more pages available"):
+    with pytest.raises(PaginationError, match="No more pages available"):
         paginator.next_page_payload()
 
 
@@ -141,6 +142,21 @@ def test_paginator_reset():
     assert paginator.current_page == 1
     assert paginator.page_size is None
     assert paginator.total_pages is None
+
+
+@pytest.mark.parametrize("bad_size", [0, -5])
+def test_paginator_reset_rejects_invalid_page_size(bad_size):
+    paginator = Paginator()
+    paginator._current_page = 5
+    paginator._page_size = 20
+    paginator._total_pages = 10
+
+    with pytest.raises(ValueError, match="Page size must be greater than 0"):
+        paginator.reset(page_size=bad_size)
+
+    assert paginator.current_page == 1
+    assert paginator.page_size == 20
+    assert paginator.total_pages == 10
 
 
 def test_paginator_reset_with_page_size():

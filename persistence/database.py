@@ -84,7 +84,7 @@ class Database:
 
     def close(self) -> None:
         """Close the database engine and dispose of connections."""
-        if self._engine is not None:
-            self._engine.dispose()
-            self._engine = None
+        if self.engine is not None:
+            self.engine.dispose()
+            self.engine = None
             self._session_factory = None

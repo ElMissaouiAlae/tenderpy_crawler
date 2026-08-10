@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+
+from core.exceptions import PaginationError
 from discovery.parser import SearchResultPage
 
 
@@ -23,6 +25,10 @@ class Paginator:
     PAGE_NUMBER_BOTTOM_PARAM = "ctl0$CONTENU_PAGE$resultSearch$numPageBottom"
     PAGE_SIZE_BOTTOM_PARAM = "ctl0$CONTENU_PAGE$resultSearch$listePageSizeBottom"
 
+    # Safety cap: if the site's HTML never yields a parseable total-pages count,
+    # has_next_page() would otherwise assume more pages exist forever.
+    MAX_PAGES_WITHOUT_TOTAL = 1000
+
     def __init__(self) -> None:
         """Initialize paginator to a pre-search state.
 
@@ -37,8 +43,9 @@ class Paginator:
     def has_next_page(self) -> bool:
         """Check if another page exists."""
         if self._total_pages is None:
-            # If total pages unknown, assume more pages exist
-            return True
+            # If total pages unknown, assume more pages exist, but bound it so a
+            # parsing regression can't spin the crawler forever.
+            return self._current_page < self.MAX_PAGES_WITHOUT_TOTAL
         return self._current_page < self._total_pages
 
     def set_total_pages(self, total_pages: int | None) -> None:
@@ -51,7 +58,7 @@ class Paginator:
         return self._current_page
 
     @property
-    def page_size(self) -> int:
+    def page_size(self) -> int | None:
         """Get the page size."""
         return self._page_size
 
@@ -66,7 +73,7 @@ class Paginator:
     def total_pages(self) -> int | None:
         """Get the total number of pages."""
         return self._total_pages
-    
+
     def sync_from_page(self, page: SearchResultPage) -> None:
         """Reconcile paginator state with the server's authoritative response.
 
@@ -81,9 +88,8 @@ class Paginator:
 
     def next_page_payload(self) -> dict[str, str]:
         """Generate POST payload parameters for the next page."""
-        
         if not self.has_next_page():
-            raise StopIteration("No more pages available")
+            raise PaginationError("No more pages available")
 
         self._current_page += 1
 
@@ -97,9 +103,8 @@ class Paginator:
     def reset(self, page_size: int | None = None) -> None:
         """Reset pagination to the first page."""
         self._current_page = 1
-        if page_size is not None:
-            self._page_size = page_size
-        else:
+        if page_size is None:
             self._page_size = None
-        
+        else:
+            self.page_size = page_size
         self._total_pages = None

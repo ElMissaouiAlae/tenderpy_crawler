@@ -42,5 +42,5 @@ htmlcov/
 *.db
 *.sqlite3
 
-# Lock files (optional - uncomment if using uv)
+# Lock files
 uv.lock

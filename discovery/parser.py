@@ -86,11 +86,11 @@ class SearchResultParser:
         """Convert a table row into a Tender object."""
         if row is None:
             return None
- 
+
         ref_cell = row.find("td", headers="cons_ref")
         if ref_cell is None:
             return None
- 
+
         tender = Tender()
         tender.tender_id = self._extract_hidden_value(row, "refCons")
         tender.organization_acronym = self._extract_hidden_value(row, "orgCons")
@@ -106,7 +106,7 @@ class SearchResultParser:
 
     def extract_pagination(self, soup: BeautifulSoup) -> dict[str, int | None]:
         """Extract pagination metadata from the page-size/page-number control widget.
- 
+
         The site renders this widget twice (Top and Bottom variants share the same
         structure, e.g. numPageTop/numPageBottom), so ids are matched by suffix.
         """
@@ -120,7 +120,7 @@ class SearchResultParser:
         total_results = self._to_int(
             self._extract_text_by_id_suffix(soup, r"nombreElement$")
         )
- 
+
         return {
             "current_page": current_page,
             "total_pages": total_pages,
@@ -135,21 +135,21 @@ class SearchResultParser:
             return None
         value = input_tag.get("value")
         return value if value else None
- 
+
     def _find_by_id_suffix(self, container: Any, id_suffix: str) -> Any:
         """Find a descendant whose id ends with the given suffix.
- 
+
         No separator (e.g. underscore) is required before the suffix, since the
         live site prefixes generated control ids (ctl0_..._panelBlocX) while
         simpler markup (tests, other pages) may use the bare id directly.
         """
         return container.find(id=re.compile(re.escape(id_suffix) + r"$"))
- 
+
     def _extract_by_id_suffix(self, container: Any, id_suffix: str) -> str | None:
         """Generic helper: find a descendant whose id ends with the given suffix and clean its text."""
         node = self._find_by_id_suffix(container, id_suffix)
         return self._clean_text(node) if node is not None else None
- 
+
     def _extract_publication_date(self, ref_cell: Any) -> str | None:
         """The publication date is a bare <div>DD/MM/YYYY</div> with no id/class."""
         date_pattern = re.compile(r"\d{2}/\d{2}/\d{4}")
@@ -158,12 +158,12 @@ class SearchResultParser:
             if text and date_pattern.fullmatch(text):
                 return text
         return None
- 
+
     def _extract_reference_number(self, row: Any) -> str | None:
         """Reference number is held in a <span class="ref"> element."""
         ref_span = row.find("span", class_="ref")
         return self._clean_text(ref_span) if ref_span is not None else None
- 
+
     def _extract_labeled_block(self, row: Any, id_suffix: str) -> str | None:
         """Extract text from a block like '<strong>Label:</strong> value', stripping the label."""
         block = self._find_by_id_suffix(row, id_suffix)
@@ -175,7 +175,7 @@ class SearchResultParser:
         if full_text and label_text:
             full_text = full_text.replace(label_text, "", 1).strip(" :\u00a0")
         return full_text or None
- 
+
     def _extract_location(self, row: Any) -> str | None:
         """Location block may repeat itself in a hidden tooltip; take just the first line."""
         block = self._find_by_id_suffix(row, "panelBlocLieuxExec")
@@ -185,7 +185,7 @@ class SearchResultParser:
         if direct_strings:
             return re.sub(r"\s+", " ", direct_strings[0]).strip() or None
         return self._clean_text(block)
- 
+
     def _extract_tender_end_date(self, row: Any) -> str | None:
         """Deadline is the first '.cloture-line' block (a hidden duplicate may also exist)."""
         cloture_div = row.find("div", class_="cloture-line")
@@ -193,7 +193,7 @@ class SearchResultParser:
             return None
         text = self._clean_text(cloture_div)
         return re.sub(r"\s+", " ", text) if text else None
- 
+
     def _extract_attr_by_id_suffix(self, soup: BeautifulSoup, id_pattern: str, attr: str) -> str | None:
         """Find an element whose id matches the given (regex) suffix and return an attribute value."""
         node = soup.find(id=re.compile(id_pattern))
@@ -201,12 +201,12 @@ class SearchResultParser:
             return None
         value = node.get(attr)
         return value if value else None
- 
+
     def _extract_text_by_id_suffix(self, soup: BeautifulSoup, id_pattern: str) -> str | None:
         """Find an element whose id matches the given (regex) suffix and return its cleaned text."""
         node = soup.find(id=re.compile(id_pattern))
         return self._clean_text(node) if node is not None else None
- 
+
     def _extract_selected_page_size(self, soup: BeautifulSoup) -> int | None:
         """Read the currently selected <option> value from the page-size <select>."""
         select = soup.find("select", id=re.compile(r"listePageSize(Top|Bottom)$"))
@@ -216,7 +216,7 @@ class SearchResultParser:
         if option is None:
             return None
         return self._to_int(option.get("value"))
- 
+
     def _to_int(self, value: str | None) -> int | None:
         if value is None:
             return None
@@ -224,7 +224,7 @@ class SearchResultParser:
             return int(value)
         except ValueError:
             return None
- 
+
     def _clean_text(self, node: Any) -> str | None:
         text = "".join(node.stripped_strings) if hasattr(node, "stripped_strings") else str(node)
         return re.sub(r"\s+", " ", text).strip() or None

@@ -39,10 +39,10 @@ class HttpClient:
         self._timeout = timeout
         self._retries = retries
         self._request_delay = request_delay
-        
+
         # Set default headers
         self._session.headers.update(self.DEFAULT_HEADERS)
-        
+
         # Configure automatic retry logic
         self._setup_retries()
 
@@ -62,14 +62,6 @@ class HttpClient:
         self._session.mount("http://", adapter)
         self._session.mount("https://", adapter)
 
-    def _has_dcookie_or_rx(self, response: requests.Response) -> bool:
-        """Check if response contains dcookie or RX* pattern in cookies."""
-        for cookie_name in response.cookies:
-            if cookie_name == "dcookie" or cookie_name.startswith("RX"):
-                return True
-        return False
-
-
     def get(self, url: str, **kwargs: Any) -> requests.Response:
         """Perform a GET request and return the response."""
         return self._request("GET", url, **kwargs)
@@ -85,11 +77,11 @@ class HttpClient:
         # Extract timeout and allow_redirects before use for potential retry
         timeout = kwargs.pop("timeout", self._timeout)
         allow_redirects = kwargs.pop("allow_redirects", True)
-        
+
         # Add delay before request if specified
         if self._request_delay > 0:
             time.sleep(self._request_delay)
-        
+
         try:
             response = self._session.request(
                 method=method,
@@ -102,37 +94,7 @@ class HttpClient:
             return response
         except requests.RequestException as exc:
             # Capture set-cookie headers even on failed requests
-            set_cookies = {}
-            if hasattr(exc, 'response') and exc.response is not None:
-                set_cookies = dict(exc.response.cookies)
-                
-                # Controlled retry: on first 403 with dcookie/RX* present, sleep briefly, then retry
-                # Uses same session object so cookies (including SERVERID) carry forward to subsequent requests
-                if (method == "GET" and 
-                    hasattr(exc, 'response') and 
-                    exc.response is not None and 
-                    exc.response.status_code == 403 and 
-                    self._has_dcookie_or_rx(exc.response)):
-                    time.sleep(1)  # Brief sleep before retry
-                    try:
-                        response = self._session.request(
-                            method=method,
-                            url=full_url,
-                            timeout=timeout,
-                            allow_redirects=allow_redirects,
-                            **kwargs,
-                        )
-                        response.raise_for_status()
-                        return response                        
-                    except requests.RequestException as retry_exc:
-                        # Retry failed, update set_cookies from retry attempt if available
-                        if hasattr(retry_exc, 'response') and retry_exc.response is not None:
-                            set_cookies = dict(retry_exc.response.cookies)
-                        raise HttpRequestError(
-                            f"{method} request failed for {full_url} after retry: {retry_exc}",
-                            set_cookies=set_cookies
-                        ) from retry_exc
-                    
+            set_cookies = dict(exc.response.cookies) if exc.response is not None else {}
             raise HttpRequestError(
                 f"{method} request failed for {full_url}: {exc}",
                 set_cookies=set_cookies
