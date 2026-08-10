@@ -14,7 +14,6 @@ class DiscoveryOrchestrator:
 
     def __init__(self, session: SearchSession) -> None:
         """Initialize the orchestrator with an active SearchSession."""
-        self._session = session
         self._client = DiscoveryClient(session)
 
     def discover(self, criteria: SearchCriteria) -> list[Tender]:

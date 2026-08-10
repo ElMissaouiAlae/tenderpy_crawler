@@ -3,8 +3,7 @@ import builtins
 import pytest
 
 from core.exceptions import HtmlParsingError, PradoStateError
-from core.models import SessionState
-from core.session import SearchSession
+from core.session import SearchSession, SessionState
 
 
 def test_session_state_to_payload_returns_expected_dict():

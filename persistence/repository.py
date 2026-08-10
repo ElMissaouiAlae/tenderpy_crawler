@@ -48,6 +48,7 @@ class TenderRepository:
         Raises:
             RepositoryError: if the save operation fails.
         """
+        tender.validate()
         try:
             with self._database.session() as session:
                 record = to_record(tender)
@@ -97,6 +98,9 @@ class TenderRepository:
         """
         if not tenders:
             return
+
+        for tender in tenders:
+            tender.validate()
 
         try:
             with self._database.session() as session:

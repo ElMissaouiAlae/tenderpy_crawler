@@ -1,10 +1,10 @@
-"""Domain models for crawler session state."""
+"""Domain model for tenders discovered by the crawler."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 
-from .exceptions import PradoStateError
+from .exceptions import MissingTenderFieldError
 
 
 @dataclass
@@ -22,27 +22,15 @@ class Tender:
     location: str | None = None
     tender_end_date: str | None = None
 
-
-@dataclass
-class SessionState:
-    """Represents the current hidden PRADO state for a server session."""
-
-    prado_page_state: str | None = None
-    
-    def to_payload(self) -> dict[str, str]:
-        """Convert the current PRADO session state into POST parameters.
+    def validate(self) -> None:
+        """Ensure identity fields are populated before persistence.
 
         Raises:
-            PradoStateError: if PRADO_PAGESTATE hasn't been captured yet —
-                every postback requires it, so a missing value here means
-                this was called before any page was fetched.
+            MissingTenderFieldError: if tender_id or organization_acronym is
+                missing. Both are required for the (tender_id, organization_acronym)
+                uniqueness constraint the persistence layer relies on to dedupe records.
         """
-        if self.prado_page_state is None:
-            raise PradoStateError(
-                "PRADO_PAGESTATE is not set — fetch a page before building a payload"
-            )
-
-        return {
-            "PRADO_PAGESTATE": self.prado_page_state,
-            "PRADO_POSTBACK_PARAMETER": "undefined",
-        }
+        if not self.tender_id:
+            raise MissingTenderFieldError("Tender.tender_id is required")
+        if not self.organization_acronym:
+            raise MissingTenderFieldError("Tender.organization_acronym is required")

@@ -8,7 +8,7 @@ import pytest
 from core.models import Tender
 from discovery.client import DiscoveryClient
 from discovery.parser import SearchCriteria, SearchResultPage
-from core.exceptions import SearchExecutionError
+from core.exceptions import PaginationError, SearchExecutionError
 
 
 def test_discovery_client_initialization():
@@ -172,7 +172,7 @@ def test_next_page_raises_when_no_more_pages():
     client._paginator._total_pages = 5
     
     current_page = SearchResultPage()
-    with pytest.raises(StopIteration, match="No more pages available"):
+    with pytest.raises(PaginationError, match="No more pages available"):
         client.next_page(current_page)
 
 
