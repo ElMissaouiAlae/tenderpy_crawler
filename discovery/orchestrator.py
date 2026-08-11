@@ -29,4 +29,5 @@ class DiscoveryOrchestrator:
     def discover_paginated(self, criteria: SearchCriteria) -> list[list[Tender]]:
         """Discover all tenders, yielding pages of tenders."""
         all_pages = self._client.search_all(criteria)
+            
         return [page.tenders for page in all_pages]
