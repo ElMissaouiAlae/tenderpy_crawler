@@ -24,6 +24,16 @@ def test_download_url_builds_expected_query_string():
     )
 
 
+def test_download_url_encodes_reserved_characters():
+    http_client = Mock()
+    downloader = TenderDownloader(http_client, "A&B", "x=y z")
+
+    assert downloader.download_url == (
+        "?page=entreprise.EntrepriseDownloadCompleteDce"
+        "&reference=A%26B&orgAcronym=x%3Dy+z"
+    )
+
+
 def test_download_calls_http_client_get_with_download_url():
     http_client = Mock()
     mock_response = Mock(content=b"PK\x03\x04fake-zip-bytes")

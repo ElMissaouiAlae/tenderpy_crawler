@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import List
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert
 
 from core.models import Tender
@@ -73,7 +73,7 @@ class TenderRepository:
                             tender_object=record.tender_object,
                             public_buyer=record.public_buyer,
                             publication_date=record.publication_date,
-                            updated_at=TenderRecord.updated_at,
+                            updated_at=func.now(),
                         ),
                     )
                 )
@@ -103,7 +103,13 @@ class TenderRepository:
 
         try:
             with self._database.session() as session:
-                records = [to_record(tender) for tender in tenders]
+                # ON CONFLICT DO UPDATE can't hit the same key twice in one statement.
+                # Dedupe by (tender_id, organization_acronym); last occurrence wins.
+                deduped: dict[tuple[str, str], Tender] = {}
+                for tender in tenders:
+                    deduped[(tender.tender_id, tender.organization_acronym)] = tender
+
+                records = [to_record(tender) for tender in deduped.values()]
 
                 insert_stmt = insert(TenderRecord).values(
                     [
@@ -130,7 +136,7 @@ class TenderRepository:
                         tender_object=insert_stmt.excluded.tender_object,
                         public_buyer=insert_stmt.excluded.public_buyer,
                         publication_date=insert_stmt.excluded.publication_date,
-                        updated_at=TenderRecord.updated_at,
+                        updated_at=func.now(),
                     ),
                 )
 

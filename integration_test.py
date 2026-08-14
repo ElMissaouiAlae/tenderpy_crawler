@@ -5,6 +5,7 @@ This script tests different search parameters and logs returned tender objects.
 
 import json
 import logging
+import sys
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
@@ -147,6 +148,10 @@ def test_date_range_search():
     Unlike the other test_* functions here, this one doesn't dump results to a
     JSON file - discover() persists to the 'tender_records' table as a side
     effect, and this then reads back from the database to confirm it landed.
+
+    Raises on any failure (connection errors, write failures, missing
+    persisted records) instead of swallowing them - callers must not treat
+    a caught exception here as a passing run.
     """
     logger.info("\n" + "="*60)
     logger.info("TEST: Date Range Search (persists to Postgres)")
@@ -194,6 +199,10 @@ def test_date_range_search():
                         "was not found in the database after discover()"
                     )
             logger.info(f"Verified {verified}/{len(tenders)} discovered tenders are present in the database")
+            if verified != len(tenders):
+                raise AssertionError(
+                    f"Persistence verification failed: {verified}/{len(tenders)} records found"
+                )
 
             for i, tender in enumerate(tenders[:5], 1):
                 logger.info(f"Tender {i}:")
@@ -207,9 +216,9 @@ def test_date_range_search():
                 logger.info(f"... and {len(tenders) - 5} more tenders")
 
             return tenders
-    except Exception as e:
-        log_http_error(e, "date_range_search")
-        return []
+    except Exception as exc:
+        log_http_error(exc, "date_range_search")
+        raise
     finally:
         if database is not None:
             database.close()
@@ -400,10 +409,14 @@ def main():
     # test_keyword_search, test_buyer_search, test_combined_search, and
     # test_pagination are kept but not invoked; analyze_results() operates on
     # the JSON files those produce, so it's likewise not invoked here.
-    test_date_range_search()
+    try:
+        test_date_range_search()
+    except Exception:
+        logger.error("Integration test failed - see above for details")
+        sys.exit(1)
 
     logger.info("\n" + "="*60)
-    logger.info("Integration tests completed")
+    logger.info("Integration tests completed successfully")
     logger.info("Check integration_test.log for detailed logs")
     logger.info("="*60)
 
