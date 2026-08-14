@@ -6,7 +6,6 @@ from typing import List
 
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
-from sqlalchemy.orm import Session
 
 from core.models import Tender
 from persistence.database import Database
@@ -106,35 +105,33 @@ class TenderRepository:
             with self._database.session() as session:
                 records = [to_record(tender) for tender in tenders]
 
-                stmt = (
-                    insert(TenderRecord)
-                    .values(
-                        [
-                            dict(
-                                tender_id=record.tender_id,
-                                organization_acronym=record.organization_acronym,
-                                procurement_type=record.procurement_type,
-                                category=record.category,
-                                publication_date=record.publication_date,
-                                reference_number=record.reference_number,
-                                tender_object=record.tender_object,
-                                public_buyer=record.public_buyer,
-                                location=record.location,
-                                tender_end_date=record.tender_end_date,
-                                status=record.status,
-                            )
-                            for record in records
-                        ]
-                    )
-                    .on_conflict_do_update(
-                        index_elements=["tender_id", "organization_acronym"],
-                        set_=dict(
-                            tender_object=insert.excluded.tender_object,
-                            public_buyer=insert.excluded.public_buyer,
-                            publication_date=insert.excluded.publication_date,
-                            updated_at=TenderRecord.updated_at,
-                        ),
-                    )
+                insert_stmt = insert(TenderRecord).values(
+                    [
+                        dict(
+                            tender_id=record.tender_id,
+                            organization_acronym=record.organization_acronym,
+                            procurement_type=record.procurement_type,
+                            category=record.category,
+                            publication_date=record.publication_date,
+                            reference_number=record.reference_number,
+                            tender_object=record.tender_object,
+                            public_buyer=record.public_buyer,
+                            location=record.location,
+                            tender_end_date=record.tender_end_date,
+                            status=record.status,
+                        )
+                        for record in records
+                    ]
+                )
+
+                stmt = insert_stmt.on_conflict_do_update(
+                    index_elements=["tender_id", "organization_acronym"],
+                    set_=dict(
+                        tender_object=insert_stmt.excluded.tender_object,
+                        public_buyer=insert_stmt.excluded.public_buyer,
+                        publication_date=insert_stmt.excluded.publication_date,
+                        updated_at=TenderRecord.updated_at,
+                    ),
                 )
 
                 session.execute(stmt)

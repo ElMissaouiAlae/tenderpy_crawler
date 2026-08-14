@@ -42,5 +42,8 @@ htmlcov/
 *.db
 *.sqlite3
 
+# Environment variables
+.env
+
 # Lock files
 uv.lock

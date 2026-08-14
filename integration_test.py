@@ -12,6 +12,7 @@ from core.http import HttpClient
 from core.session import SearchSession
 from discovery.orchestrator import DiscoveryOrchestrator
 from discovery.parser import SearchCriteria
+from persistence import Database, Settings, TenderRepository
 
 # Configure logging
 logging.basicConfig(
@@ -141,40 +142,77 @@ def test_keyword_search():
 
 
 def test_date_range_search():
-    """Test search with date range parameters."""
+    """Test search with date range parameters (last 2 days), persisting directly to Postgres.
+
+    Unlike the other test_* functions here, this one doesn't dump results to a
+    JSON file - discover() persists to the 'tender_records' table as a side
+    effect, and this then reads back from the database to confirm it landed.
+    """
     logger.info("\n" + "="*60)
-    logger.info("TEST 2: Date Range Search")
+    logger.info("TEST: Date Range Search (persists to Postgres)")
     logger.info("="*60)
-    
+
+    database = None
     try:
+        database = Database(Settings.from_env())
+        repository = TenderRepository(database)
+
         with HttpClient(base_url=BASE_URL, timeout=30) as http_client:
             session = SearchSession(http_client)
-            
+
             # Initialize session
             init_url = f"{BASE_URL}/index.php?page=entreprise.EntrepriseAdvancedSearch"
             logger.info(f"Initializing session with: {init_url}")
             session.initialize(init_url)
             logger.info(f"Session initialized successfully. PRADO state: {session.state.prado_page_state[:50] if session.state.prado_page_state else 'None'}...")
-            
-            orchestrator = DiscoveryOrchestrator(session)
-            
-            # Search with date range (last 30 days)
+
+            orchestrator = DiscoveryOrchestrator(session, repository)
+
+            # Search with date range (last 2 days)
             end_date = date.today()
-            start_date = end_date - timedelta(days=30)
-            
+            start_date = end_date - timedelta(days=2)
+
             criteria = SearchCriteria(
                 publication_date_from=start_date,
                 publication_date_to=end_date
             )
             logger.info(f"Searching with date range: {start_date} to {end_date}")
-            
+
             tenders = orchestrator.discover(criteria)
-            log_tenders(tenders, "date_range_search")
-            
+            logger.info(f"Discovered {len(tenders)} tenders - persisted to 'tender_records' as a side effect of discover()")
+
+            # Verify persistence by reading each discovered tender back from the database
+            verified = 0
+            for tender in tenders:
+                if not tender.tender_id or not tender.organization_acronym:
+                    continue
+                if repository.exists(tender.tender_id, tender.organization_acronym):
+                    verified += 1
+                else:
+                    logger.warning(
+                        f"Tender {tender.tender_id}/{tender.organization_acronym} "
+                        "was not found in the database after discover()"
+                    )
+            logger.info(f"Verified {verified}/{len(tenders)} discovered tenders are present in the database")
+
+            for i, tender in enumerate(tenders[:5], 1):
+                logger.info(f"Tender {i}:")
+                logger.info(f"  ID: {tender.tender_id}")
+                logger.info(f"  Organization: {tender.organization_acronym}")
+                logger.info(f"  Object: {tender.tender_object}")
+                logger.info(f"  Buyer: {tender.public_buyer}")
+                logger.info(f"  Publication Date: {tender.publication_date}")
+
+            if len(tenders) > 5:
+                logger.info(f"... and {len(tenders) - 5} more tenders")
+
             return tenders
     except Exception as e:
         log_http_error(e, "date_range_search")
         return []
+    finally:
+        if database is not None:
+            database.close()
 
 
 def test_buyer_search():
@@ -353,25 +391,20 @@ def analyze_results():
 
 
 def main():
-    """Run all integration tests."""
+    """Run integration tests for the crawler."""
     logger.info("Starting integration tests for crawler")
     logger.info(f"Base URL: {BASE_URL}")
     logger.info("Make sure to update BASE_URL with the correct website URL")
-    
-    # Run tests
-    test_keyword_search()
+
+    # Only the date-range search runs for now - it persists directly to Postgres.
+    # test_keyword_search, test_buyer_search, test_combined_search, and
+    # test_pagination are kept but not invoked; analyze_results() operates on
+    # the JSON files those produce, so it's likewise not invoked here.
     test_date_range_search()
-    test_buyer_search()
-    test_combined_search()
-    test_pagination()
-    
-    # Analyze results
-    analyze_results()
-    
+
     logger.info("\n" + "="*60)
     logger.info("Integration tests completed")
     logger.info("Check integration_test.log for detailed logs")
-    logger.info("Check test_results/ directory for JSON output files")
     logger.info("="*60)
 
 

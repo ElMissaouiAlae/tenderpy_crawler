@@ -61,16 +61,23 @@ def verify_schema(database: Database) -> bool:
                     "Run Alembic migrations to update the schema."
                 )
 
-            # Check for unique constraint on (tender_id, organization_acronym)
+            # Check for a unique constraint OR unique index on (tender_id, organization_acronym).
+            # The model enforces this via a unique Index rather than a formal CONSTRAINT,
+            # and Postgres ON CONFLICT (used by the repository's upserts) works against either.
             constraints = inspector.get_unique_constraints("tender_records")
+            indexes = inspector.get_indexes("tender_records")
+
             unique_constraint_exists = any(
                 set(constraint["column_names"]) == {"tender_id", "organization_acronym"}
                 for constraint in constraints
+            ) or any(
+                index["unique"] and set(index["column_names"]) == {"tender_id", "organization_acronym"}
+                for index in indexes
             )
 
             if not unique_constraint_exists:
                 raise DatabaseConnectionError(
-                    "Required unique constraint on (tender_id, organization_acronym) "
+                    "Required unique constraint or unique index on (tender_id, organization_acronym) "
                     "does not exist. Run Alembic migrations to create the schema."
                 )
 
