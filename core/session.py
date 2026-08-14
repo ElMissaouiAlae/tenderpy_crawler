@@ -60,9 +60,9 @@ class SearchSession:
 
         return response
 
-    def get(self, url: str) -> requests.Response:
+    def get(self, url: str, **kwargs: Any) -> requests.Response:
         """Perform a GET request and refresh the PRADO state from the returned HTML."""
-        response = self._http_client.get(url)
+        response = self._http_client.get(url, **kwargs)
 
         # Mid-session parsing failure shouldn't throw an "Initialization" error
         self._update_state_from_html(response.text)

@@ -1,0 +1,15 @@
+services:
+  test_db:
+    image: postgres:16-alpine
+    container_name: pg_test_env
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: tenders_test_db
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - pg_test_data:/var/lib/postgresql/data
+
+volumes:
+  pg_test_data:
