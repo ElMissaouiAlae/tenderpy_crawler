@@ -61,7 +61,6 @@ class SearchResultParser:
             tenders=[tender for tender in tenders if tender is not None],
             current_page=pagination.get("current_page"),
             total_pages=pagination.get("total_pages"),
-            page_size=pagination.get("page_size"),
             total_results=pagination.get("total_results"),
         )
 
@@ -111,12 +110,11 @@ class SearchResultParser:
         structure, e.g. numPageTop/numPageBottom), so ids are matched by suffix.
         """
         current_page = self._to_int(
-            self._extract_attr_by_id_suffix(soup, r"numPage(Top|Bottom)$", "value")
+            self._extract_attr_by_id_suffix(soup, r"numPageTop$", "value")
         )
         total_pages = self._to_int(
-            self._extract_text_by_id_suffix(soup, r"nombrePage(Top|Bottom)$")
+            self._extract_text_by_id_suffix(soup, r"nombrePageTop$")
         )
-        page_size = self._extract_selected_page_size(soup)
         total_results = self._to_int(
             self._extract_text_by_id_suffix(soup, r"nombreElement$")
         )
@@ -124,7 +122,6 @@ class SearchResultParser:
         return {
             "current_page": current_page,
             "total_pages": total_pages,
-            "page_size": page_size,
             "total_results": total_results,
         }
 
@@ -206,16 +203,6 @@ class SearchResultParser:
         """Find an element whose id matches the given (regex) suffix and return its cleaned text."""
         node = soup.find(id=re.compile(id_pattern))
         return self._clean_text(node) if node is not None else None
-
-    def _extract_selected_page_size(self, soup: BeautifulSoup) -> int | None:
-        """Read the currently selected <option> value from the page-size <select>."""
-        select = soup.find("select", id=re.compile(r"listePageSize(Top|Bottom)$"))
-        if select is None:
-            return None
-        option = select.find("option", selected=True)
-        if option is None:
-            return None
-        return self._to_int(option.get("value"))
 
     def _to_int(self, value: str | None) -> int | None:
         if value is None:

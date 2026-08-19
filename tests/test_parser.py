@@ -72,7 +72,6 @@ def test_search_result_page_creation_with_defaults():
     assert page.tenders == []
     assert page.current_page is None
     assert page.total_pages is None
-    assert page.page_size is None
     assert page.total_results is None
 
 
@@ -82,7 +81,6 @@ def test_search_result_page_creation_with_values():
         tenders=tenders,
         current_page=1,
         total_pages=5,
-        page_size=20,
         total_results=100
     )
     assert len(page.tenders) == 2
@@ -108,21 +106,18 @@ def test_search_result_parser_extracts_pagination():
     html = """
     <html>
         <body>
-            <input id="ctl0_CONTENU_PAGE_resultSearch_numPageTop" value="2" />
-            <span id="ctl0_CONTENU_PAGE_resultSearch_nombrePageTop">5</span>
-            <select id="ctl0_CONTENU_PAGE_resultSearch_listePageSizeTop">
-                <option value="20" selected>20</option>
-            </select>
-            <span id="ctl0_CONTENU_PAGE_resultSearch_nombreElement">100</span>
+            <input name="ctl0$CONTENU_PAGE$resultSearch$numPageTop" type="text" 
+            value="3" id="ctl0_CONTENU_PAGE_resultSearch_numPageTop" title="N° de la page"/>
+            <span id="ctl0_CONTENU_PAGE_resultSearch_nombrePageTop">51</span>
+            <span id="ctl0_CONTENU_PAGE_resultSearch_nombreElement">501</span>
         </body>
     </html>
     """
     parser = SearchResultParser()
     page = parser.parse(html)
-    assert page.current_page == 2
-    assert page.total_pages == 5
-    assert page.page_size == 20
-    assert page.total_results == 100
+    assert page.current_page == 3
+    assert page.total_pages == 51
+    assert page.total_results == 501
 
 
 def test_search_result_parser_handles_missing_pagination():
@@ -131,5 +126,4 @@ def test_search_result_parser_handles_missing_pagination():
     page = parser.parse(html)
     assert page.current_page is None
     assert page.total_pages is None
-    assert page.page_size is None
     assert page.total_results is None

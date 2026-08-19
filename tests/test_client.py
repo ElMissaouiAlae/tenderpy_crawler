@@ -108,7 +108,6 @@ def test_search_success(mock_parser_class):
         tenders=[Tender(tender_id="123")],
         current_page=1,
         total_pages=1,
-        page_size=20
     ))
     mock_parser_class.return_value = mock_parser
     
@@ -148,13 +147,11 @@ def test_next_page_success(mock_parser_class):
         tenders=[Tender(tender_id="456")],
         current_page=2,
         total_pages=3,
-        page_size=20
     ))
     mock_parser_class.return_value = mock_parser
     
     client = DiscoveryClient(session)
     client._paginator._current_page = 1
-    client._paginator._page_size = 20
     client._paginator._total_pages = 3
     client._last_row_echo = {}
     
@@ -184,8 +181,8 @@ def test_search_all_multiple_pages(mock_parser_class):
     
     mock_parser = Mock()
     mock_parser.parse = Mock(side_effect=[
-        SearchResultPage(tenders=[Tender(tender_id="1")], current_page=1, total_pages=2, page_size=20),
-        SearchResultPage(tenders=[Tender(tender_id="2")], current_page=2, total_pages=2, page_size=20)
+        SearchResultPage(tenders=[Tender(tender_id="1")], current_page=1, total_pages=2),
+        SearchResultPage(tenders=[Tender(tender_id="2")], current_page=2, total_pages=2)
     ])
     mock_parser_class.return_value = mock_parser
     

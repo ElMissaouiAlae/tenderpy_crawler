@@ -13,17 +13,14 @@ class PageParams:
     """Represents pagination parameters for a POST request."""
 
     current_page: int
-    page_size: int
     total_pages: int | None = None
 
 
 class Paginator:
     """Manage pagination state and generate next page payloads."""
 
-    PAGE_NUMBER_TOP_PARAM = "ctl0$CONTENU_PAGE$resultSearch$numPageTop"
-    PAGE_SIZE_TOP_PARAM = "ctl0$CONTENU_PAGE$resultSearch$listePageSizeTop"
+    PAGE_NUMBER_TOP_PARAM = "ctl0$CONTENU_PAGE$resultSearch$numPageTop" 
     PAGE_NUMBER_BOTTOM_PARAM = "ctl0$CONTENU_PAGE$resultSearch$numPageBottom"
-    PAGE_SIZE_BOTTOM_PARAM = "ctl0$CONTENU_PAGE$resultSearch$listePageSizeBottom"
 
     # Safety cap: if the site's HTML never yields a parseable total-pages count,
     # has_next_page() would otherwise assume more pages exist forever.
@@ -36,8 +33,8 @@ class Paginator:
         which is the sole source of truth for pagination state — see
         `Client.search()`.
         """
-        self._current_page = 1
-        self._page_size: int | None = None   # unknown until first response
+        self._current_page = 0
+        self._page_number = 0
         self._total_pages: int | None = None
 
     def has_next_page(self) -> bool:
@@ -58,18 +55,6 @@ class Paginator:
         return self._current_page
 
     @property
-    def page_size(self) -> int | None:
-        """Get the page size."""
-        return self._page_size
-
-    @page_size.setter
-    def page_size(self, size: int) -> None:
-        """Set the page size."""
-        if size <= 0:
-            raise ValueError("Page size must be greater than 0")
-        self._page_size = size
-
-    @property
     def total_pages(self) -> int | None:
         """Get the total number of pages."""
         return self._total_pages
@@ -82,8 +67,6 @@ class Paginator:
         """
         if page.current_page is not None:
             self._current_page = page.current_page
-        if page.page_size is not None:
-            self.page_size = page.page_size  # goes through the validating setter
         self.set_total_pages(page.total_pages)
 
     def next_page_payload(self) -> dict[str, str]:
@@ -91,20 +74,17 @@ class Paginator:
         if not self.has_next_page():
             raise PaginationError("No more pages available")
 
-        self._current_page += 1
+        self._page_number += 1
 
         return {
-            self.PAGE_NUMBER_TOP_PARAM: str(self._current_page),
-            self.PAGE_SIZE_TOP_PARAM: str(self._page_size),
-            self.PAGE_NUMBER_BOTTOM_PARAM: str(self._current_page),
-            self.PAGE_SIZE_BOTTOM_PARAM: str(self._page_size),
+            self.PAGE_NUMBER_TOP_PARAM: str(self._page_number),
+            "ctl0$CONTENU_PAGE$resultSearch$listePageSizeTop" : '10',
+            self.PAGE_NUMBER_BOTTOM_PARAM: str(self._page_number),
+            "ctl0$CONTENU_PAGE$resultSearch$listePageSizeBottom" : '10',
         }
 
-    def reset(self, page_size: int | None = None) -> None:
+    def reset(self) -> None:
         """Reset pagination to the first page."""
-        self._current_page = 1
-        if page_size is None:
-            self._page_size = None
-        else:
-            self.page_size = page_size
+        self._current_page = 0
         self._total_pages = None
+        self._page_number = 0
