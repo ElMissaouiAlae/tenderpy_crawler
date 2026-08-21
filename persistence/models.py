@@ -62,7 +62,7 @@ class TenderRecord(Base):
     category: Mapped[str | None] = mapped_column(String(100))
     publication_date: Mapped[str | None] = mapped_column(String(20), index=True)
     reference_number: Mapped[str | None] = mapped_column(String(100))
-    tender_object: Mapped[str | None] = mapped_column(String(1000))
+    tender_object: Mapped[str | None] = mapped_column(String)
     public_buyer: Mapped[str | None] = mapped_column(String(500))
     location: Mapped[str | None] = mapped_column(String(500))
     tender_end_date: Mapped[str | None] = mapped_column(String(50))

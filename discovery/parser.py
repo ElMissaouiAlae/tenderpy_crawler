@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import re
 from dataclasses import dataclass, field
 from datetime import date
@@ -11,6 +12,8 @@ from bs4 import BeautifulSoup
 
 from core.exceptions import HtmlParsingError
 from core.models import Tender
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -52,8 +55,8 @@ class SearchResultParser:
             raise HtmlParsingError("Received empty HTML response")
 
         soup = BeautifulSoup(html, "html.parser")
-        table = self.extract_table(soup)
-        rows = self.extract_rows(table)
+        rows = self.extract_rows(soup)
+        logger.info("Discovered %d rows in parsed HTML", len(rows))
         tenders = [self.extract_tender(row) for row in rows]
         pagination = self.extract_pagination(soup)
 
@@ -61,26 +64,27 @@ class SearchResultParser:
             tenders=[tender for tender in tenders if tender is not None],
             current_page=pagination.get("current_page"),
             total_pages=pagination.get("total_pages"),
-            page_size=pagination.get("page_size"),
             total_results=pagination.get("total_results"),
         )
 
-    def extract_table(self, soup: BeautifulSoup) -> Any:
-        """Find the main results table by anchoring on a known header cell id."""
-        header_cell = soup.find("th", id="cons_ref")
-        if header_cell is None:
-            return None
-        return header_cell.find_parent("table")
+    def extract_rows(self, soup: BeautifulSoup) -> list[Any]:
+        """Extract tender rows, identified by the presence of the cons_ref data cell.
 
-    def extract_rows(self, table: Any) -> list[Any]:
-        """Extract tender rows, identified by the presence of the cons_ref data cell."""
-        if table is None:
-            return []
-        return [
-            row
-            for row in table.find_all("tr")
-            if row.find_all("th") == [] and row.find("td", headers="cons_ref") is not None
-        ]
+        Searches the whole document (not scoped to a `table` Tag) because the
+        live site emits unclosed `<div>` elements inside every row, which can
+        cause BeautifulSoup's html.parser to nest later rows as descendants of
+        an earlier row's div instead of as siblings under `<table>`. Walking up
+        from each `td[headers="cons_ref"]` cell to its own `<tr>` finds every
+        row regardless of how the tree ends up shaped.
+        """
+        tds = soup.find_all("td", headers="cons_ref")
+        rows = []
+        for td in tds:
+            row = td.find_parent("tr")
+            if row is None or row.find_all("th") != []:
+                continue
+            rows.append(row)
+        return rows
 
     def extract_tender(self, row: Any) -> Tender | None:
         """Convert a table row into a Tender object."""
@@ -111,12 +115,11 @@ class SearchResultParser:
         structure, e.g. numPageTop/numPageBottom), so ids are matched by suffix.
         """
         current_page = self._to_int(
-            self._extract_attr_by_id_suffix(soup, r"numPage(Top|Bottom)$", "value")
+            self._extract_attr_by_id_suffix(soup, r"numPageTop$", "value")
         )
         total_pages = self._to_int(
-            self._extract_text_by_id_suffix(soup, r"nombrePage(Top|Bottom)$")
+            self._extract_text_by_id_suffix(soup, r"nombrePageTop$")
         )
-        page_size = self._extract_selected_page_size(soup)
         total_results = self._to_int(
             self._extract_text_by_id_suffix(soup, r"nombreElement$")
         )
@@ -124,7 +127,6 @@ class SearchResultParser:
         return {
             "current_page": current_page,
             "total_pages": total_pages,
-            "page_size": page_size,
             "total_results": total_results,
         }
 
@@ -206,16 +208,6 @@ class SearchResultParser:
         """Find an element whose id matches the given (regex) suffix and return its cleaned text."""
         node = soup.find(id=re.compile(id_pattern))
         return self._clean_text(node) if node is not None else None
-
-    def _extract_selected_page_size(self, soup: BeautifulSoup) -> int | None:
-        """Read the currently selected <option> value from the page-size <select>."""
-        select = soup.find("select", id=re.compile(r"listePageSize(Top|Bottom)$"))
-        if select is None:
-            return None
-        option = select.find("option", selected=True)
-        if option is None:
-            return None
-        return self._to_int(option.get("value"))
 
     def _to_int(self, value: str | None) -> int | None:
         if value is None:
