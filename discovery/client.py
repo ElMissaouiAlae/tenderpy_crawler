@@ -21,12 +21,6 @@ class DiscoveryClient:
 
     ROW_ECHO_PREFIX = "ctl0$CONTENU_PAGE$resultSearch$tableauResultSearch"
 
-    # Static page size used by the site (see Paginator.next_page_payload).
-    PAGE_SIZE = 10
-    # Diagnostic cap: if a page never reaches PAGE_SIZE tenders after this many
-    # retries, stop and return whatever was parsed rather than looping forever.
-    MAX_ROW_RETRIES = 3
-
     SEARCH_URL = "index.php?page=entreprise.EntrepriseAdvancedSearch&searchAnnCons"
     _POSTBACK_TARGET_PARAM = "PRADO_POSTBACK_TARGET"
 
@@ -81,7 +75,9 @@ class DiscoveryClient:
             payload = self._build_search_payload(criteria)
             payload.update(self._session.state.to_payload())
 
-            page = self._post_until_full_page(payload)
+            response = self._session.post(self.SEARCH_URL, data=payload)
+
+            page = self._parser.parse(response.text)
             self._paginator.sync_from_page(page)
             self._last_row_echo = self._build_row_echo_payload(page)
 
@@ -102,7 +98,8 @@ class DiscoveryClient:
             payload[self._POSTBACK_TARGET_PARAM] = self.PAGER_NEXT   # always this, never computed
             payload.update(self._session.state.to_payload())  # freshest pagestate wins
 
-            page = self._post_until_full_page(payload)
+            response = self._session.post(self.SEARCH_URL, data=payload)
+            page = self._parser.parse(response.text)
 
             self._paginator.sync_from_page(page)
             self._last_row_echo = self._build_row_echo_payload(page)  # refresh for page N+2
@@ -126,32 +123,6 @@ class DiscoveryClient:
             all_pages.append(current_page)
 
         return all_pages
-
-    def _post_until_full_page(self, payload: dict[str, str]) -> SearchResultPage:
-        """Post the same payload repeatedly until the parsed page has PAGE_SIZE
-        tenders, the site reports this is the last page, or MAX_ROW_RETRIES is hit.
-
-        Diagnostic workaround for a suspected transient issue where a page only
-        yields its first row on some responses.
-        """
-        page = self._parser.parse(self._session.post(self.SEARCH_URL, data=payload).text)
-        retries = 0
-
-        while (
-            len(page.tenders) < self.PAGE_SIZE
-            and retries < self.MAX_ROW_RETRIES
-            and not self._is_last_page(page)
-        ):
-            page = self._parser.parse(self._session.post(self.SEARCH_URL, data=payload).text)
-            retries += 1
-
-        return page
-
-    def _is_last_page(self, page: SearchResultPage) -> bool:
-        """True if the site's own pagination metadata says there's nothing more to fetch."""
-        if page.current_page is None or page.total_pages is None:
-            return False
-        return page.current_page >= page.total_pages
 
     def _build_search_payload(self, criteria: SearchCriteria) -> dict[str, str]:
         """Convert SearchCriteria into PRADO POST parameters.

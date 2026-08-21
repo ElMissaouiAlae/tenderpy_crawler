@@ -11,6 +11,7 @@ from pathlib import Path
 
 from core.http import HttpClient
 from core.session import SearchSession
+from discovery.client import DiscoveryClient
 from discovery.orchestrator import DiscoveryOrchestrator
 from discovery.parser import SearchCriteria
 from persistence import Database, Settings, TenderRepository
@@ -348,6 +349,39 @@ def test_pagination():
         return []
 
 
+def test_single_page_row_extraction():
+    """Diagnostic: call DiscoveryClient.search() directly (no pagination) and
+    compare the returned tender count against the row count the parser logs,
+    to check whether the parser is dropping rows on a single page."""
+    logger.info("\n" + "="*60)
+    logger.info("TEST: Single Page Row Extraction (no pagination)")
+    logger.info("="*60)
+
+    try:
+        with HttpClient(base_url=BASE_URL, timeout=30) as http_client:
+            session = SearchSession(http_client)
+
+            init_url = f"{BASE_URL}/index.php?page=entreprise.EntrepriseAdvancedSearch"
+            logger.info(f"Initializing session with: {init_url}")
+            session.initialize(init_url)
+
+            client = DiscoveryClient(session)
+
+            criteria = SearchCriteria(keyword="travaux")
+            logger.info("Searching with criteria: keyword='travaux' (single page, no pagination)")
+
+            page = client.search(criteria)
+
+            logger.info(f"page.tenders count: {len(page.tenders)}")
+            logger.info(f"page.current_page: {page.current_page}, page.total_pages: {page.total_pages}")
+            logger.info(f"page.total_results: {page.total_results}")
+
+            return page
+    except Exception as e:
+        log_http_error(e, "single_page_row_extraction")
+        return None
+
+
 def analyze_results():
     """Analyze test results and identify potential issues."""
     logger.info("\n" + "="*60)
@@ -405,12 +439,13 @@ def main():
     logger.info(f"Base URL: {BASE_URL}")
     logger.info("Make sure to update BASE_URL with the correct website URL")
 
-    # Only the date-range search runs for now - it persists directly to Postgres.
-    # test_keyword_search, test_buyer_search, test_combined_search, and
-    # test_pagination are kept but not invoked; analyze_results() operates on
-    # the JSON files those produce, so it's likewise not invoked here.
+    # Diagnostic run for the row-extraction issue: single page, no pagination.
+    # test_date_range_search, test_keyword_search, test_buyer_search,
+    # test_combined_search, and test_pagination are kept but not invoked;
+    # analyze_results() operates on the JSON files those produce, so it's
+    # likewise not invoked here.
     try:
-        test_date_range_search()
+        test_single_page_row_extraction()
     except Exception:
         logger.error("Integration test failed - see above for details")
         sys.exit(1)

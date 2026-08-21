@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import re
 from dataclasses import dataclass, field
 from datetime import date
@@ -11,6 +12,8 @@ from bs4 import BeautifulSoup
 
 from core.exceptions import HtmlParsingError
 from core.models import Tender
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -52,8 +55,8 @@ class SearchResultParser:
             raise HtmlParsingError("Received empty HTML response")
 
         soup = BeautifulSoup(html, "html.parser")
-        table = self.extract_table(soup)
-        rows = self.extract_rows(table)
+        rows = self.extract_rows(soup)
+        logger.info("Discovered %d rows in parsed HTML", len(rows))
         tenders = [self.extract_tender(row) for row in rows]
         pagination = self.extract_pagination(soup)
 
@@ -64,22 +67,24 @@ class SearchResultParser:
             total_results=pagination.get("total_results"),
         )
 
-    def extract_table(self, soup: BeautifulSoup) -> Any:
-        """Find the main results table by anchoring on a known header cell id."""
-        header_cell = soup.find("th", id="cons_ref")
-        if header_cell is None:
-            return None
-        return header_cell.find_parent("table")
+    def extract_rows(self, soup: BeautifulSoup) -> list[Any]:
+        """Extract tender rows, identified by the presence of the cons_ref data cell.
 
-    def extract_rows(self, table: Any) -> list[Any]:
-        """Extract tender rows, identified by the presence of the cons_ref data cell."""
-        if table is None:
-            return []
-        return [
-            row
-            for row in table.find_all("tr")
-            if row.find_all("th") == [] and row.find("td", headers="cons_ref") is not None
-        ]
+        Searches the whole document (not scoped to a `table` Tag) because the
+        live site emits unclosed `<div>` elements inside every row, which can
+        cause BeautifulSoup's html.parser to nest later rows as descendants of
+        an earlier row's div instead of as siblings under `<table>`. Walking up
+        from each `td[headers="cons_ref"]` cell to its own `<tr>` finds every
+        row regardless of how the tree ends up shaped.
+        """
+        tds = soup.find_all("td", headers="cons_ref")
+        rows = []
+        for td in tds:
+            row = td.find_parent("tr")
+            if row is None or row.find_all("th") != []:
+                continue
+            rows.append(row)
+        return rows
 
     def extract_tender(self, row: Any) -> Tender | None:
         """Convert a table row into a Tender object."""
