@@ -445,7 +445,7 @@ def main():
     # analyze_results() operates on the JSON files those produce, so it's
     # likewise not invoked here.
     try:
-        test_single_page_row_extraction()
+        test_date_range_search()
     except Exception:
         logger.error("Integration test failed - see above for details")
         sys.exit(1)
