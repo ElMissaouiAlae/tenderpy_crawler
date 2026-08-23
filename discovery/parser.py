@@ -56,7 +56,6 @@ class SearchResultParser:
 
         soup = BeautifulSoup(html, "html.parser")
         rows = self.extract_rows(soup)
-        logger.info("Discovered %d rows in parsed HTML", len(rows))
         tenders = [self.extract_tender(row) for row in rows]
         pagination = self.extract_pagination(soup)
 
@@ -69,13 +68,6 @@ class SearchResultParser:
 
     def extract_rows(self, soup: BeautifulSoup) -> list[Any]:
         """Extract tender rows, identified by the presence of the cons_ref data cell.
-
-        Searches the whole document (not scoped to a `table` Tag) because the
-        live site emits unclosed `<div>` elements inside every row, which can
-        cause BeautifulSoup's html.parser to nest later rows as descendants of
-        an earlier row's div instead of as siblings under `<table>`. Walking up
-        from each `td[headers="cons_ref"]` cell to its own `<tr>` finds every
-        row regardless of how the tree ends up shaped.
         """
         tds = soup.find_all("td", headers="cons_ref")
         rows = []

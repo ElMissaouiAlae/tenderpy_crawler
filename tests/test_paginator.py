@@ -76,24 +76,24 @@ def test_paginator_sync_from_page_with_none_values():
 
 def test_paginator_next_page_payload():
     paginator = Paginator()
-    paginator._current_page = 1
+    paginator._page_number = 0
     paginator._total_pages = 5
     
     payload = paginator.next_page_payload()
     
-    assert payload["ctl0$CONTENU_PAGE$resultSearch$numPageTop"] == "2"
+    assert payload["ctl0$CONTENU_PAGE$resultSearch$numPageTop"] == "1"
     assert payload["ctl0$CONTENU_PAGE$resultSearch$listePageSizeTop"] == "10"
-    assert payload["ctl0$CONTENU_PAGE$resultSearch$numPageBottom"] == "2"
+    assert payload["ctl0$CONTENU_PAGE$resultSearch$numPageBottom"] == "1"
     assert payload["ctl0$CONTENU_PAGE$resultSearch$listePageSizeBottom"] == "10"
 
 
 def test_paginator_next_page_payload_increments_page():
     paginator = Paginator()
-    paginator._current_page = 1
+    paginator._page_number = 0
     paginator._total_pages = 5
     
     paginator.next_page_payload()
-    assert paginator.current_page == 2
+    assert paginator._page_number == 1
 
 
 def test_paginator_next_page_payload_raises_when_no_next_page():
