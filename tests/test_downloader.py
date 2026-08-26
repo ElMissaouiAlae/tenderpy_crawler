@@ -3,6 +3,8 @@
 from unittest.mock import Mock
 
 from downloader import TenderDownloader
+import logging 
+logger = logging.getLogger(__name__)
 
 
 def test_tender_downloader_initialization():
@@ -41,7 +43,9 @@ def test_download_calls_http_client_get_with_download_url():
 
     downloader = TenderDownloader(http_client, "1032737", "j0w")
     response = downloader.download()
+    logger.info(f"Response content: {response.content}")
 
     http_client.get.assert_called_once_with(downloader.download_url)
     assert response is mock_response
     assert response.content == b"PK\x03\x04fake-zip-bytes"
+
