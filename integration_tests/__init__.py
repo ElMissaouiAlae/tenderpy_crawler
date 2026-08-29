@@ -12,6 +12,7 @@ from integration_tests.pagination import test_pagination
 from integration_tests.single_page_row_extraction import (
     test_single_page_row_extraction,
 )
+from integration_tests.status_transitions import test_status_transitions
 
 __all__ = [
     "BASE_URL",
@@ -28,5 +29,6 @@ __all__ = [
     "test_keyword_search",
     "test_pagination",
     "test_single_page_row_extraction",
+    "test_status_transitions",
     "main",
 ]

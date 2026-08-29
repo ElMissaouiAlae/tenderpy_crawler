@@ -17,6 +17,7 @@ from .combined_search import test_combined_search  # noqa: F401
 from .keyword_search import test_keyword_search  # noqa: F401
 from .pagination import test_pagination  # noqa: F401
 from .single_page_row_extraction import test_single_page_row_extraction  # noqa: F401
+from .status_transitions import test_status_transitions  # noqa: F401
 
 
 def main():

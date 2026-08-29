@@ -25,7 +25,8 @@ class TenderStatus(str, Enum):
     DISCOVERED = "DISCOVERED"
     DOWNLOADING = "DOWNLOADING"
     DOWNLOADED = "DOWNLOADED"
-    PROCESSING = "PROCESSING"
+    UPLOADING = "UPLOADING"
+    UPLOADED = "UPLOADED"
     INDEXED = "INDEXED"
     FAILED = "FAILED"
 
@@ -49,6 +50,8 @@ class TenderRecord(Base):
         location: Location where tender will be executed.
         tender_end_date: Deadline for tender submission.
         status: Current processing status (VARCHAR for flexibility).
+        last_status: Last status successfully reached before a failure;
+            null unless status is FAILED.
         created_at: Timestamp when record was first created.
         updated_at: Timestamp when record was last updated.
     """
@@ -69,6 +72,7 @@ class TenderRecord(Base):
     status: Mapped[str] = mapped_column(
         String(20), default=TenderStatus.DISCOVERED.value, index=True
     )
+    last_status: Mapped[str | None] = mapped_column(String(20))
     created_at: Mapped[datetime] = mapped_column(default=datetime.now)
     updated_at: Mapped[datetime] = mapped_column(default=datetime.now, onupdate=datetime.now)
 
